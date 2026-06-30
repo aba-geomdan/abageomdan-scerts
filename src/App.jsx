@@ -11840,6 +11840,7 @@ body {
 }
 .app-shell {
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     radial-gradient(ellipse at top, rgba(232, 220, 196, 0.5) 0%, transparent 50%),
     linear-gradient(180deg, #f4efe4 0%, #ede6d5 100%);
@@ -11853,12 +11854,21 @@ body {
   box-shadow: 0 1px 0 rgba(0,0,0,0.02);
 }
 .header-inner {
-  max-width: 1320px; margin: 0 auto;
-  padding: 14px 28px;
-  display: flex; align-items: center; gap: 24px;
+  max-width: 1400px; margin: 0 auto;
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 18px;
   flex-wrap: wrap;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
+/* 좁은 화면에서 탭이 별도 줄로 떨어지게 */
+.tabs {
+  display: flex; gap: 4px; flex: 1 1 100%;
+  justify-content: center; flex-wrap: wrap;
+  order: 3;
+}
+@media (min-width: 1100px) {
+  .tabs { flex: 1 1 auto; order: 0; }
+}
+.brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .brand-mark {
   width: 42px; height: 42px;
   background: linear-gradient(135deg, #2d4a3e 0%, #1f3a30 100%);
@@ -11877,10 +11887,6 @@ body {
 .brand-sub {
   font-size: 12px; color: #6b6452;
   margin-top: 2px;
-}
-.tabs {
-  display: flex; gap: 4px; flex: 1;
-  justify-content: center; flex-wrap: wrap;
 }
 .tab {
   padding: 8px 14px;
@@ -11958,7 +11964,7 @@ body {
   background: #f4efe4; color: #6b6452; font-family: 'IBM Plex Sans KR', sans-serif;
 }
 .login-screen {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: #f4efe4; padding: 20px; font-family: 'IBM Plex Sans KR', sans-serif;
 }
 .login-box {
@@ -12001,6 +12007,7 @@ body {
 /* 로그인 화면 저작권 footer */
 .login-copyright {
   margin-top: 14px; text-align: center; font-size: 11px; color: #9a917d; line-height: 1.6;
+  max-width: 380px; width: 100%; padding: 0 16px; box-sizing: border-box;
 }
 .login-copyright-more {
   background: none; border: none; padding: 0; color: #2d4a3e;
@@ -12057,7 +12064,7 @@ body {
 
 /* 에러 화면 */
 .error-screen {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: #f4efe4; padding: 20px; font-family: 'IBM Plex Sans KR', sans-serif;
 }
 .error-box {
@@ -12081,7 +12088,8 @@ body {
   .header-saved { font-size: 10.5px; }
   .tabs { flex-wrap: wrap; }
   .progress-cards { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-  .help-dialog, .account-panel, .admin-dash { max-width: 95vw; }
+  .help-dialog, .account-panel, .admin-dash, .copyright-dialog { max-width: 95vw; }
+  .template-menu { width: calc(100vw - 40px); max-width: 360px; right: auto; left: 0; }
 }
 @media (max-width: 600px) {
   .header-inner { padding: 10px 12px; }
@@ -12091,8 +12099,16 @@ body {
   .btn-small { padding: 6px 9px; font-size: 11.5px; }
   .main { padding: 12px; }
   .report-meta th, .report-meta td { font-size: 12px; padding: 6px 8px; }
+  .approval-table th, .approval-table td { font-size: 12px; padding: 6px 8px; }
   .empty-state { padding: 40px 18px; }
   .login-box { padding: 26px 22px; }
+  .login-brand-title { font-size: 15px; }
+  .login-brand-sub { font-size: 11px; }
+  .home, .main { padding-left: 12px !important; padding-right: 12px !important; }
+  .hero-title { font-size: 26px; }
+  .hero-sub { font-size: 13.5px; }
+  .report-section { padding: 14px !important; }
+  .report-h3 { font-size: 16px !important; }
 }
 .header-auth { display: flex; align-items: center; gap: 8px; margin-left: 8px; padding-left: 12px; border-left: 1px solid #e0d8c4; }
 .header-auth-name { font-size: 13px; font-weight: 600; color: #2d4a3e; white-space: nowrap; }
@@ -15033,7 +15049,7 @@ body {
      ────────────────────────────────────────────────────────────── */
 
   /* 앱 내부 레이아웃 군더더기 제거 (보고서가 페이지를 꽉 쓰도록) */
-  .app-shell { display: block !important; background: #fff !important; }
+  .app-shell { display: block !important; background: #fff !important; overflow-x: visible !important; }
   .app-shell > .main, .main { padding: 0 !important; max-width: 100% !important; }
   .tab-content, .tab-content > .card, .card.no-break {
     margin: 0 !important; padding: 0 !important;
