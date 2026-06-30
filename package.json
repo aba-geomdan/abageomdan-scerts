@@ -1,0 +1,20 @@
+{
+  "name": "abageomdan-scerts",
+  "version": "1.0.0",
+  "description": "검단ABA SCERTS 자동화 시스템",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  },
+  "homepage": "https://aba-geomdan.github.io/abageomdan-scerts/"
+}
