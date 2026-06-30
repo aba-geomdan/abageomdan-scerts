@@ -12121,8 +12121,15 @@ body {
 .account-panel-count { font-size: 13px; color: #8a8270; font-weight: 600; }
 .account-add { background: #f9f6ef; border: 1px solid #e4dcc8; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 .account-add-title { font-size: 13.5px; font-weight: 700; color: #2d4a3e; margin-bottom: 10px; }
-.account-add-row { display: flex; gap: 8px; }
-.account-input { flex: 1; padding: 9px 12px; border: 1px solid #d9d1bd; border-radius: 8px; font-family: inherit; font-size: 14px; }
+.account-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.account-add-row .account-input { flex: 1 1 140px; min-width: 0; }
+.account-add-row .btn-primary { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .account-add-row { flex-direction: column; }
+  .account-add-row .account-input,
+  .account-add-row .btn-primary { width: 100%; flex: 1 1 auto; }
+}
+.account-input { padding: 9px 12px; border: 1px solid #d9d1bd; border-radius: 8px; font-family: inherit; font-size: 14px; min-width: 0; }
 .account-input:focus { outline: none; border-color: #2d4a3e; }
 .account-input-sm { flex: 0 1 160px; }
 .account-add-hint { font-size: 11.5px; color: #8a7a4f; margin-top: 8px; line-height: 1.5; }
@@ -12133,7 +12140,12 @@ body {
 .account-item-info { display: flex; flex-direction: column; gap: 2px; }
 .account-item-name { font-size: 14px; font-weight: 600; color: #2a2419; }
 .account-item-meta { font-size: 11.5px; color: #9a917d; }
-.account-item-actions, .account-item-edit { display: flex; gap: 6px; align-items: center; }
+.account-item-actions, .account-item-edit { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.account-item-edit .account-input { min-width: 0; flex: 1 1 140px; }
+@media (max-width: 600px) {
+  .account-item-edit { width: 100%; }
+  .account-item-edit .account-input { width: 100%; flex: 1 1 100%; }
+}
 .account-del-btn { color: #c0392b; }
 .account-del-warn { font-size: 12px; color: #8a2e23; }
 
