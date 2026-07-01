@@ -13,27 +13,35 @@ const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
 // 기존 코드의 window.storage.{get/set/list/delete} 호출을 그대로 처리
 // localStorage 폴백 포함 (네트워크 오류 시에도 작동 보장)
 // =====================================================================
-const SB_HEADERS = {
-  'apikey': SUPABASE_ANON_KEY,
-  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-  'Content-Type': 'application/json',
-};
+const SB_FN_URL = `${SUPABASE_URL}/functions/v1/scerts-data`;
 const tableName = (shared) => shared ? 'shared_store' : 'teacher_store';
 const lsKey = (shared, key) => `sb-fallback:${shared ? 's' : 't'}:${key}`;
 
+// Edge Function 공통 호출 (테이블 직접 접근 대신 프록시 경유)
+async function scFn(payload) {
+  const res = await fetch(SB_FN_URL, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const out = await res.json();
+  if (!res.ok || out.error) throw new Error(out.error || `HTTP ${res.status}`);
+  return out.data;
+}
+
 async function sbGet(key, shared) {
   try {
-    const url = `${SUPABASE_URL}/rest/v1/${tableName(shared)}?key=eq.${encodeURIComponent(key)}&select=key,value`;
-    const r = await fetch(url, { headers: SB_HEADERS });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const rows = await r.json();
-    if (rows && rows.length > 0) {
-      try { localStorage.setItem(lsKey(shared, key), rows[0].value); } catch (e) {}
-      return { key: rows[0].key, value: rows[0].value, shared };
+    const data = await scFn({ action: 'get', key, shared });
+    if (data && data.value != null) {
+      try { localStorage.setItem(lsKey(shared, key), data.value); } catch (e) {}
+      return { key: data.key, value: data.value, shared };
     }
     return null;
   } catch (e) {
-    // 폴백: localStorage에서 시도
     try {
       const v = localStorage.getItem(lsKey(shared, key));
       if (v !== null) return { key, value: v, shared };
@@ -43,16 +51,9 @@ async function sbGet(key, shared) {
 }
 
 async function sbSet(key, value, shared) {
-  // 항상 localStorage에도 저장 (오프라인 폴백)
   try { localStorage.setItem(lsKey(shared, key), value); } catch (e) {}
   try {
-    const url = `${SUPABASE_URL}/rest/v1/${tableName(shared)}`;
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ key, value, updated_at: new Date().toISOString() }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    await scFn({ action: 'set', key, value, shared });
     return { key, value, shared };
   } catch (e) {
     return { key, value, shared, _fallback: true };
@@ -62,8 +63,7 @@ async function sbSet(key, value, shared) {
 async function sbDelete(key, shared) {
   try { localStorage.removeItem(lsKey(shared, key)); } catch (e) {}
   try {
-    const url = `${SUPABASE_URL}/rest/v1/${tableName(shared)}?key=eq.${encodeURIComponent(key)}`;
-    await fetch(url, { method: 'DELETE', headers: SB_HEADERS });
+    await scFn({ action: 'delete', key, shared });
     return { key, deleted: true, shared };
   } catch (e) {
     return { key, deleted: false, shared };
@@ -72,15 +72,25 @@ async function sbDelete(key, shared) {
 
 async function sbList(prefix, shared) {
   try {
-    const filter = prefix ? `&key=like.${encodeURIComponent(prefix)}*` : '';
-    const url = `${SUPABASE_URL}/rest/v1/${tableName(shared)}?select=key${filter}`;
-    const r = await fetch(url, { headers: SB_HEADERS });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const rows = await r.json();
-    return { keys: (rows || []).map((row) => row.key), prefix, shared };
+    const data = await scFn({ action: 'list', prefix, shared });
+    return { keys: (data && data.keys) || [], prefix, shared };
   } catch (e) {
     return { keys: [], prefix, shared };
   }
+}
+
+// SCERTS 계정 전용 서버 액션 (해시 처리)
+async function scVerifyLogin(name, pw) {
+  return await scFn({ action: 'verifyLogin', name, pw });
+}
+async function scAddUser(name, pw) {
+  return await scFn({ action: 'addUser', name, pw });
+}
+async function scRemoveUser(name) {
+  return await scFn({ action: 'removeUser', name });
+}
+async function scChangeUserPw(name, newPw) {
+  return await scFn({ action: 'changeUserPw', name, newPw });
 }
 
 // window.storage 인터페이스로 노출 (기존 코드가 그대로 동작하도록)
@@ -4314,9 +4324,19 @@ export default function App() {
       setLoginError(`관리자는 '${ADMIN_NAME}'만 가능합니다. 본인 이름과 비밀번호로 로그인해주세요.`);
       return;
     }
-    const user = userList.find((u) => u.name === loginName.trim() && u.pw === loginPw.trim());
-    if (!user) { setLoginError('이름 또는 비밀번호가 일치하지 않습니다.'); return; }
-    const session = { name: user.name, role: 'therapist' };
+    // 선생님: 서버에서 비밀번호 검증 (평문→해시 자동 전환)
+    let result;
+    try {
+      result = await scVerifyLogin(loginName.trim(), loginPw.trim());
+    } catch (e) {
+      setLoginError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    if (!result || !result.ok) {
+      setLoginError((result && result.error) || '이름 또는 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    const session = { name: result.user.name, role: 'therapist' };
     setAuthUser(session); setLoginError('');
     setLoginName(''); setLoginPw(''); // 평문 비번 메모리에 안 남기기
     try { if (window.storage) await window.storage.set(AUTH_KEY, JSON.stringify(session), false); } catch (e) {}
@@ -4336,18 +4356,30 @@ export default function App() {
     if (nm === ADMIN_NAME) return { ok: false, msg: `'${ADMIN_NAME}'은 관리자 이름이라 사용할 수 없습니다.` };
     if (userList.length >= MAX_USERS) return { ok: false, msg: `최대 ${MAX_USERS}명까지 등록 가능합니다.` };
     if (userList.some((u) => u.name === nm)) return { ok: false, msg: '이미 존재하는 이름입니다.' };
-    const updated = [...userList, { name: nm, pw: pwd, role: 'therapist', created: new Date().toISOString().slice(0, 10) }];
-    await saveUsers(updated);
-    return { ok: true };
+    try {
+      const res = await scAddUser(nm, pwd);
+      if (res && res.users) setUserList(res.users);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, msg: '계정 추가 중 오류가 발생했습니다.' };
+    }
   };
   const removeUser = async (name) => {
-    await saveUsers(userList.filter((u) => u.name !== name));
+    try {
+      const res = await scRemoveUser(name);
+      if (res && res.users) setUserList(res.users);
+    } catch (e) {}
   };
   const changeUserPw = async (name, newPw) => {
     const pwd = (newPw || '').trim();
     if (!pwd) return { ok: false, msg: '새 비밀번호를 입력하세요.' };
-    await saveUsers(userList.map((u) => (u.name === name ? { ...u, pw: pwd } : u)));
-    return { ok: true };
+    try {
+      const res = await scChangeUserPw(name, pwd);
+      if (res && res.users) setUserList(res.users);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, msg: '비밀번호 변경 중 오류가 발생했습니다.' };
+    }
   };
 
   return <AppInner
@@ -5553,7 +5585,7 @@ function AccountPanel({ userList, addUser, removeUser, changeUserPw, onClose }) 
             <div key={u.name} className="account-item">
               <div className="account-item-info">
                 <span className="account-item-name">👤 {u.name}</span>
-                <span className="account-item-meta">비번: {u.pw} · 등록 {u.created || '-'}</span>
+                <span className="account-item-meta">등록 {u.created || '-'}</span>
               </div>
               {editPwFor === u.name ? (
                 <div className="account-item-edit">
